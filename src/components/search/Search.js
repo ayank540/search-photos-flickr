@@ -3,6 +3,7 @@ import axios from "axios";
 import { Image, Modal, Button } from "react-bootstrap";
 import FlatList from "flatlist-react";
 import RecentSearches from "./RecentSearches";
+import Loader from "../Loader";
 
 class Search extends Component {
   constructor() {
@@ -17,8 +18,9 @@ class Search extends Component {
     searchApiUrl:
       "https://www.flickr.com/services/rest/?method=flickr.photos.search&api_key=59a29f5605a377d0fec08b57452b1b6c&tags=",
     images: {},
+    temp: [],
     isLoading: true,
-    hasMoreItems: false,
+    hasMoreItems: true,
     pageNo: 1,
     recentSearches: [],
     focus: false,
@@ -38,8 +40,8 @@ class Search extends Component {
       .catch((error) => {
         console.log(error);
       });
-    this.setState({ images: data.data.photos });
-    console.log(this.state.images.photo);
+    this.setState({ temp: [...this.state.temp, ...data.data.photos.photo] });
+    this.setState({ pageNo: this.state.pageNo + 1 });
   }
   onTextChange = (e) => {
     this.setState({ [e.target.name]: e.target.value });
@@ -56,15 +58,13 @@ class Search extends Component {
           "recentSearches",
           JSON.stringify(this.state.recentSearches)
         );
-        console.log(localStorage.getItem("recentSearches"));
         axios
           .get(
             `${
               this.state.searchApiUrl + this.state.searchText
             }&safe_search=true&per_page=15&page=1&format=json&nojsoncallback=1`
           )
-          .then((res) => this.setState({ images: res.data.photos }))
-          // .then(res=>console.log(res.data.photos))
+          .then((res) => this.setState({ temp: res.data.photos.photo }))
           .catch((err) => console.log(err));
       });
     }
@@ -75,24 +75,12 @@ class Search extends Component {
   handleCloseClick = () => {
     this.setState({ focus: false });
   };
-  handleClearClick = () =>{
-    localStorage.clear()
-  }
-  fetchData = () => {
-    // this is simple example but most of good paginated apis will give you total items count and offset information
-    fetch(
-      `${this.state.apiUrl}page=${this.state.pageNo}&format=json&nojsoncallback=1`
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        this.setState((prevState) => ({
-          pageNo: this.state.pageNo + 1,
-          hasMoreItems: data.page < data.pages,
-          myApiData: [...prevState.myApiData, ...data.results],
-          loading: false,
-        }));
-      });
+  handleClearClick = () => {
+    localStorage.clear();
+    this.handleCloseClick();
+    this.handleInputFocus();
   };
+
   render() {
     return (
       <div>
@@ -116,7 +104,7 @@ class Search extends Component {
               border: "1px solid lightgrey",
               width: "40rem",
               margin: "0 auto",
-              marginTop: "-50px"
+              marginTop: "-50px",
             }}
           >
             <RecentSearches />
@@ -143,42 +131,22 @@ class Search extends Component {
         ) : null}
         <div className="flat-list">
           <FlatList
-            list={this.state.images.photo}
+            list={this.state.temp}
             renderItem={(item) => (
               <Image
                 src={`https://live.staticflickr.com/${item.server}/${item.id}_${item.secret}_m.jpg`}
-                // https://live.staticflickr.com/7372/12502775644_acfd415fa7_w.jpg
-                // https://live.staticflickr.com/${img.server}/${img.id}_${img.secret}_w.jpg
-
                 thumbnail
               />
-              //   console.log(item)
             )}
-            renderWhenEmpty={() => (
-              <div class="sk-cube-grid">
-                <div class="sk-cube sk-cube1"></div>
-                <div class="sk-cube sk-cube2"></div>
-                <div class="sk-cube sk-cube3"></div>
-                <div class="sk-cube sk-cube4"></div>
-                <div class="sk-cube sk-cube5"></div>
-                <div class="sk-cube sk-cube6"></div>
-                <div class="sk-cube sk-cube7"></div>
-                <div class="sk-cube sk-cube8"></div>
-                <div class="sk-cube sk-cube9"></div>
-              </div>
-            )}
+            renderWhenEmpty={() => <Loader />}
             display={{
               grid: true,
               gridGap: "50px",
             }}
-            paginate={{
-              hasMore: this.state.hasMoreItems,
-              loadMore: this.fetchData,
-              loadingIndicator: (
-                <div style={{ background: "#090" }}>Getting more items...</div>
-              ),
-              loadingIndicatorPosition: "center",
-            }}
+            hasMoreItems={this.state.hasMoreItems}
+            loadMoreItems={this.getRecent}
+            paginationLoadingIndicator={<Loader />}
+            paginationLoadingIndicatorPosition="center"
           />
         </div>
       </div>
